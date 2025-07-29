@@ -1,0 +1,120 @@
+import cv2
+import time
+import argparse
+import os
+import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
+from mediapipe.framework.formats import landmark_pb2
+
+# Parser de argumentos
+parser = argparse.ArgumentParser(description="Estimativa de pose com MediaPipe Tasks API")
+parser.add_argument("--model", choices=["lite", "full", "heavy"], default="full",
+                    help="Escolha o modelo: lite, full ou heavy (padrão: full)")
+args = parser.parse_args()
+
+# Mapeamento do modelo
+model_paths = {
+    "lite": "models/pose_landmarker_lite.task",
+    "full": "models/pose_landmarker_full.task",
+    "heavy": "models/pose_landmarker_heavy.task"
+}
+model_path = model_paths[args.model]
+
+# Configurações do PoseLandmarker
+BaseOptions = mp.tasks.BaseOptions
+PoseLandmarker = mp.tasks.vision.PoseLandmarker
+PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions
+VisionRunningMode = mp.tasks.vision.RunningMode
+
+# Utilitário de desenho
+mp_drawing = mp.solutions.drawing_utils
+mp_pose = mp.solutions.pose
+
+# Variável para armazenar o resultado mais recente
+latest_result = None
+
+# Callback para processar o resultado
+def result_callback(result: vision.PoseLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
+    global latest_result
+    latest_result = result
+
+# Cria o detector
+options = PoseLandmarkerOptions(
+    base_options=BaseOptions(model_asset_path=model_path),
+    running_mode=VisionRunningMode.LIVE_STREAM,
+    result_callback=result_callback,
+    output_segmentation_masks=False,
+    num_poses=1
+)
+
+# Inicia a webcam
+cap = cv2.VideoCapture(0)
+if not cap.isOpened():
+    print("Erro ao abrir a webcam.")
+    exit()
+
+frame_count = 0
+total_processing_time = 0.0
+with PoseLandmarker.create_from_options(options) as landmarker:
+    while True:
+        start_time = time.time()
+        
+        ret, frame = cap.read()
+        if not ret:
+            print("Erro ao capturar frame.")
+            break
+
+        # Converte para RGB
+        image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
+
+        # Envia para o detector com timestamp em milissegundos
+        timestamp_ms = int(time.time() * 1000)
+        #result = landmarker.detect_for_video(mp_image, timestamp_ms=timestamp_ms)
+        landmarker.detect_async(mp_image, timestamp_ms)
+
+        if latest_result and latest_result.pose_landmarks:
+             landmarks = latest_result.pose_landmarks[0]
+             landmark_list = landmark_pb2.NormalizedLandmarkList()
+
+             for lm in landmarks:
+                 landmark = landmark_pb2.NormalizedLandmark(
+                     x=lm.x,
+                     y=lm.y,
+                     z=lm.z,
+                     visibility=lm.visibility,
+                     presence=lm.presence
+                 )
+                 landmark_list.landmark.append(landmark)
+
+             mp_drawing.draw_landmarks(
+                 frame,
+                 landmark_list,
+                 mp_pose.POSE_CONNECTIONS,
+                 mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
+                 mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
+             )
+
+            # FPS
+        fps = 1 / (time.time() - start_time + 1e-6)
+        cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+
+        # Mostra a imagem
+        cv2.imshow("MediaPipe Pose (Tasks API)", frame)
+
+        frame_count += 1
+        total_processing_time += (time.time() - start_time)
+        
+        # Verifica se a tecla 'q' foi pressionada para sair
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            # Média de FPS
+            avg_fps = frame_count / total_processing_time
+            print(f"\nMedia de FPS durante a execucao: {avg_fps:.2f}")
+            print(f"Total de frames processados: {frame_count}")
+            print(f"Tempo total de execucao: {total_processing_time:.2f} segundos")
+            break
+
+cap.release()
+cv2.destroyAllWindows()
