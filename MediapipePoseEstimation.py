@@ -31,10 +31,10 @@ VisionRunningMode = mp.tasks.vision.RunningMode
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
-# Variável para armazenar o resultado mais recente
+# Variável para armazenar o resultado mais recente em deteccao assincrona
 latest_result = None
 
-# Callback para processar o resultado
+# Callback para processar o resultado (usado em deteccao assincrona)
 def result_callback(result: vision.PoseLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
     global latest_result
     latest_result = result
@@ -42,8 +42,8 @@ def result_callback(result: vision.PoseLandmarkerResult, output_image: mp.Image,
 # Cria o detector
 options = PoseLandmarkerOptions(
     base_options=BaseOptions(model_asset_path=model_path),
-    running_mode=VisionRunningMode.LIVE_STREAM,
-    result_callback=result_callback,
+    running_mode=VisionRunningMode.VIDEO,
+    #result_callback=result_callback, --> usado para deteccao assincrona
     output_segmentation_masks=False,
     num_poses=1
 )
@@ -71,32 +71,34 @@ with PoseLandmarker.create_from_options(options) as landmarker:
 
         # Envia para o detector com timestamp em milissegundos
         timestamp_ms = int(time.time() * 1000)
-        #result = landmarker.detect_for_video(mp_image, timestamp_ms=timestamp_ms)
-        landmarker.detect_async(mp_image, timestamp_ms)
 
-        if latest_result and latest_result.pose_landmarks:
-             landmarks = latest_result.pose_landmarks[0]
-             landmark_list = landmark_pb2.NormalizedLandmarkList()
+        ### DETECCAO ASSINCRONA:
+        #landmarker.detect_async(mp_image, timestamp_ms)
 
-             for lm in landmarks:
-                 landmark = landmark_pb2.NormalizedLandmark(
-                     x=lm.x,
-                     y=lm.y,
-                     z=lm.z,
-                     visibility=lm.visibility,
-                     presence=lm.presence
-                 )
-                 landmark_list.landmark.append(landmark)
+        # if latest_result and latest_result.pose_landmarks:
 
-             mp_drawing.draw_landmarks(
-                 frame,
-                 landmark_list,
-                 mp_pose.POSE_CONNECTIONS,
-                 mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
-                 mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
-             )
+        ### DETECCAO SINCRONA:
+        result = landmarker.detect_for_video(mp_image, timestamp_ms=timestamp_ms)
 
-            # FPS
+        if result.pose_landmarks:
+            landmarks = result.pose_landmarks[0]
+            landmark_list = landmark_pb2.NormalizedLandmarkList()
+            for lm in landmarks:
+                landmark = landmark_pb2.NormalizedLandmark(
+                    x=lm.x, y=lm.y, z=lm.z,
+                    visibility=lm.visibility, presence=lm.presence
+                )
+                landmark_list.landmark.append(landmark)
+
+            mp_drawing.draw_landmarks(
+                frame,
+                landmark_list,
+                mp_pose.POSE_CONNECTIONS,
+                mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
+                mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
+            )
+
+        # FPS
         fps = 1 / (time.time() - start_time + 1e-6)
         cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)

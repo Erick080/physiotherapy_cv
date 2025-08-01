@@ -1,12 +1,14 @@
 <h2>Instruções de Execução: </h2>
 
-* Inicie o ambiente virtual do python: `python3 -m venv venv`
+* Inicie o ambiente virtual do python: `python3 -m venv .venv`
+
+OBS: O mediapipe suporta as versões do python de 3.9 até 3.12
 
 * Ative o ambiente virtual:
 
-    Windows: `./venv/Scripts/Activate`
+    Windows: `./.venv/Scripts/Activate`
 
-    Linux: `source venv/bin/activate`
+    Linux: `source .venv/bin/activate`
 
 * Instale as dependências:
     
