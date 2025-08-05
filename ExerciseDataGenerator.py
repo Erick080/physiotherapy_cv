@@ -3,3 +3,54 @@
 ### Depois vai calcular o angulo de cada tripleto (especificados no MediapipePoseEstimator.py) e salvar em
 ### um yml na pasta exercises_data, para ser usado futuramente na comparação
 
+import os
+import argparse
+import yaml
+import mediapipe as mp
+from mediapipe.tasks import python
+from mediapipe.tasks.python import vision
+
+from GeometryUtils import calcular_angulos_frame
+
+# Argumentos de linha de comando
+parser = argparse.ArgumentParser(description="Estimador de pose usando MediaPipe")
+parser.add_argument('--images_dir', type=str, required=True, help='Diretório contendo imagens de entrada')
+parser.add_argument('--model_type', type=str, required=True, choices=['heavy', 'full', 'lite'], help='Tipo de modelo a ser usado')
+parser.add_argument('--output_file', type=str, default='poses_output.yml', help='Arquivo de saída YAML')
+args = parser.parse_args()
+
+# Caminhos dos modelos
+model_paths = {
+  'heavy': os.path.join('models', 'pose_landmarker_heavy.task'),
+  'full': os.path.join('models', 'pose_landmarker_full.task'),
+  'lite': os.path.join('models', 'pose_landmarker_lite.task')
+}
+model_path = model_paths[args.model_type]
+
+BaseOptions = mp.tasks.BaseOptions
+PoseLandmarker = mp.tasks.vision.PoseLandmarker
+PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions
+VisionRunningMode = mp.tasks.vision.RunningMode
+
+options = PoseLandmarkerOptions(
+    base_options=BaseOptions(model_asset_path=model_path),
+    running_mode=VisionRunningMode.IMAGE)
+
+pose_outputs = {}
+with PoseLandmarker.create_from_options(options) as landmarker:
+    filenames = sorted(os.listdir(args.images_dir))
+    for idx, filename in enumerate(filenames):
+        image_path = os.path.join(args.images_dir, filename)
+        mp_image = mp.Image.create_from_file(image_path)
+        result = landmarker.detect(mp_image)
+
+        frame_key = f'frame_{idx}'
+        if result.pose_landmarks:
+            pose_outputs[frame_key] = calcular_angulos_frame(result.pose_landmarks[0])
+        else:
+            pose_outputs[frame_key] = {}
+
+#print(pose_outputs)
+
+with open(args.output_file, 'w') as f:
+    yaml.dump(pose_outputs, f, sort_keys=False, default_flow_style=False)

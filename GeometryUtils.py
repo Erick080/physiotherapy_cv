@@ -5,16 +5,16 @@ import numpy as np
 TRIPLETOS = [
     (11, 13, 15),    # OMBRO E BRACO ESQUERDO
     (12, 14, 16),    # OMBRO E BRACO DIREITO
-    (11, 23, 25)     # TORSO E CINTURA ESQUERDA
-    (12, 24, 26)     # TORSO E CINTURA
+    (11, 23, 25),    # TORSO E CINTURA ESQUERDA
+    (12, 24, 26),    # TORSO E CINTURA
     (23, 25, 27),    # PERNA ESQUERDA 
-    (24, 26, 38),    # PERNA DIREITA        
+    (24, 26, 28),    # PERNA DIREITA        
 ]
 
 def calcular_angulo_2d(a, b, c):    # calcula o angulo de um tripleto (angulo entre AB e CB)
     # calcula vetores ab e cb
-    ab = (a[0] - b[0], a[1] - b[1])
-    cb = (c[0] - b[0], c[1] - b[1])
+    ab = (a.x - b.x, a.y - b.y)
+    cb = (c.x - b.x, c.y - b.y)
     # calcula produto escalar: u . v = x1 * x2 + y1 * y2
     produto_escalar = ab[0]*cb[0] + ab[1]*cb[1]
     # norma (magnitude) dos vetores
