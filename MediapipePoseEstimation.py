@@ -2,10 +2,13 @@ import cv2
 import time
 import argparse
 import os
+import yaml
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from mediapipe.framework.formats import landmark_pb2
+
+from GeometryUtils import calcular_angulos_frame, comparar_angulos
 
 # Parser de argumentos
 parser = argparse.ArgumentParser(description="Estimativa de pose com MediaPipe Tasks API")
@@ -20,6 +23,35 @@ model_paths = {
     "heavy": "models/pose_landmarker_heavy.task"
 }
 model_path = model_paths[args.model]
+
+# Carregamento de exercícios cadastrados
+exercicios = [f for f in os.listdir("exercises_output")]
+if not exercicios:
+    print("ERRO: Nenhum exercício cadastrado")
+    exit()
+
+exercicios_dados = [] # array que contem os angulos de todos exercicios cadastrados
+for nome_arquivo in exercicios:
+    caminho = os.path.join("exercises_output", nome_arquivo)
+    with open(caminho, "r") as f:
+        dados = yaml.safe_load(f)
+        exercicios_dados.append(dados)
+
+# Menu de escolha de exercício
+for idx, nome in enumerate(exercicios):
+    print(f"{idx+1}. {nome}")
+
+while True:
+    try:
+        escolha = int(input("\nDigite o número do exercício desejado: "))
+        if 1 <= escolha <= len(exercicios):
+            exercicio_selecionado = exercicios[escolha-1]
+            print(f"Exercício selecionado: {exercicio_selecionado}")
+            break
+        else:
+            print("Número inválido, tente novamente.")
+    except ValueError:
+        print("Entrada inválida, digite um número.")
 
 # Configurações do PoseLandmarker
 BaseOptions = mp.tasks.BaseOptions
@@ -54,8 +86,6 @@ if not cap.isOpened():
     print("Erro ao abrir a webcam.")
     exit()
 
-frame_count = 0
-total_processing_time = 0.0
 with PoseLandmarker.create_from_options(options) as landmarker:
     while True:
         start_time = time.time()
@@ -90,6 +120,7 @@ with PoseLandmarker.create_from_options(options) as landmarker:
                 )
                 landmark_list.landmark.append(landmark)
 
+            # Verificar se é melhor desenhar as linhas antes ou depois do cálculo de corretude
             mp_drawing.draw_landmarks(
                 frame,
                 landmark_list,
@@ -97,6 +128,9 @@ with PoseLandmarker.create_from_options(options) as landmarker:
                 mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
                 mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
             )
+            
+            angulos_frame = calcular_angulos_frame(landmarks)
+
 
         # FPS
         fps = 1 / (time.time() - start_time + 1e-6)
@@ -105,17 +139,9 @@ with PoseLandmarker.create_from_options(options) as landmarker:
 
         # Mostra a imagem
         cv2.imshow("MediaPipe Pose (Tasks API)", frame)
-
-        frame_count += 1
-        total_processing_time += (time.time() - start_time)
         
         # Verifica se a tecla 'q' foi pressionada para sair
         if cv2.waitKey(1) & 0xFF == ord('q'):
-            # Média de FPS
-            avg_fps = frame_count / total_processing_time
-            print(f"\nMedia de FPS durante a execucao: {avg_fps:.2f}")
-            print(f"Total de frames processados: {frame_count}")
-            print(f"Tempo total de execucao: {total_processing_time:.2f} segundos")
             break
 
 cap.release()

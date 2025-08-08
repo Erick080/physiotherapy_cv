@@ -45,7 +45,7 @@ with PoseLandmarker.create_from_options(options) as landmarker:
         result = landmarker.detect(mp_image)
 
         frame_key = f'frame_{idx}'
-        if result.pose_landmarks:
+        if result.pose_landmarks:            
             pose_outputs[frame_key] = calcular_angulos_frame(result.pose_landmarks[0])
         else:
             pose_outputs[frame_key] = {}
