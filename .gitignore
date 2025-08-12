@@ -1,3 +1,9 @@
 *.task
 .venv
+bin
+include
+lib
+lib64
+share
+pyvenv.cfg
 __pycache__

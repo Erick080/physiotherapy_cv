@@ -41,13 +41,13 @@ for nome_arquivo in exercicios:
 for idx, nome in enumerate(exercicios):
     print(f"{idx+1}. {nome}")
 
-angulos_ref = {} # vai conter os dados do yaml do exercicio selecionado
+dados_exercicio_selecionado = {}
 while True:
     try:
         escolha = int(input("\nDigite o número do exercício desejado: "))
         if 1 <= escolha <= len(exercicios):
             exercicio_selecionado = exercicios[escolha-1]
-            angulos_ref = exercicios_dados[escolha-1]  # pega os angulos do yaml do exercicio selecionado
+            dados_exercicio_selecionado = exercicios_dados[escolha-1]
             print(f"Exercício selecionado: {exercicio_selecionado}")
             break
         else:
@@ -55,6 +55,8 @@ while True:
     except ValueError:
         print("Entrada inválida, digite um número.")
 
+tipo_exercicio = dados_exercicio_selecionado.get('tipo_exercicio')
+angulos_ref = dados_exercicio_selecionado.get('frames', {})
 # Configurações do PoseLandmarker
 BaseOptions = mp.tasks.BaseOptions
 PoseLandmarker = mp.tasks.vision.PoseLandmarker
@@ -99,17 +101,9 @@ with PoseLandmarker.create_from_options(options) as landmarker:
             print("Erro ao capturar frame.")
             break
 
-        # Converte para RGB
         image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image_rgb)
-
-        # Envia para o detector com timestamp em milissegundos
         timestamp_ms = int(time.time() * 1000)
-
-        ### DETECCAO ASSINCRONA:
-        #landmarker.detect_async(mp_image, timestamp_ms)
-
-        # if latest_result and latest_result.pose_landmarks:
 
         ### DETECCAO SINCRONA:
         result = landmarker.detect_for_video(mp_image, timestamp_ms=timestamp_ms)

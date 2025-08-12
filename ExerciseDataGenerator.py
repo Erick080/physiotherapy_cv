@@ -17,6 +17,7 @@ parser = argparse.ArgumentParser(description="Estimador de pose usando MediaPipe
 parser.add_argument('--images_dir', type=str, required=True, help='Diretório contendo imagens de entrada')
 parser.add_argument('--model_type', type=str, required=True, choices=['heavy', 'full', 'lite'], help='Tipo de modelo a ser usado')
 parser.add_argument('--output_file', type=str, default='poses_output.yml', help='Arquivo de saída YAML')
+parser.add_argument('--tipo_exercicio', type=str, required=True, choices=['braco','perna','braco_e_perna'], help='Tipo do exercicio: braco, perna ou braco e perna')
 args = parser.parse_args()
 
 # Caminhos dos modelos
@@ -52,5 +53,10 @@ with PoseLandmarker.create_from_options(options) as landmarker:
 
 #print(pose_outputs)
 
+yaml_dict = {
+    'tipo_exercicio' : args.tipo_exercicio,
+    'frames' : pose_outputs
+}
+
 with open(args.output_file, 'w') as f:
-    yaml.dump(pose_outputs, f, sort_keys=False, default_flow_style=False)
+    yaml.dump(yaml_dict, f, sort_keys=False, default_flow_style=False)
