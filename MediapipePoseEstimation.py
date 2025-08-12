@@ -41,11 +41,13 @@ for nome_arquivo in exercicios:
 for idx, nome in enumerate(exercicios):
     print(f"{idx+1}. {nome}")
 
+angulos_ref = {} # vai conter os dados do yaml do exercicio selecionado
 while True:
     try:
         escolha = int(input("\nDigite o número do exercício desejado: "))
         if 1 <= escolha <= len(exercicios):
             exercicio_selecionado = exercicios[escolha-1]
+            angulos_ref = exercicios_dados[escolha-1]  # pega os angulos do yaml do exercicio selecionado
             print(f"Exercício selecionado: {exercicio_selecionado}")
             break
         else:
@@ -87,6 +89,8 @@ if not cap.isOpened():
     exit()
 
 with PoseLandmarker.create_from_options(options) as landmarker:
+    pose_index = 0 # Index da pose atual sendo usada na comparacao
+    reps = 0 # Contador de repetições
     while True:
         start_time = time.time()
         
@@ -129,9 +133,23 @@ with PoseLandmarker.create_from_options(options) as landmarker:
                 mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
             )
             
-            angulos_frame = calcular_angulos_frame(landmarks)
+            angulos_detect_frame = calcular_angulos_frame(landmarks)
+            angulos_ref_frame = angulos_ref.get(f'frame_{pose_index}', {})
+            if comparar_angulos(angulos_detect_frame, angulos_ref_frame):
+                pose_index += 1
+                if pose_index >= len(angulos_ref):
+                    pose_index = 0
+                    reps += 1
 
-
+        # Mostra número de poses detectadas e quantas faltam para acabar o exercicio
+        num_poses = len(angulos_ref)
+        cv2.putText(frame, f"Pose {pose_index}/{num_poses}", (10, 60),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        
+        # Mostra numero de repetições
+        cv2.putText(frame, f"Reps: {reps}", (10, 100),
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        
         # FPS
         fps = 1 / (time.time() - start_time + 1e-6)
         cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30),

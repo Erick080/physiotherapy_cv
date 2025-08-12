@@ -39,7 +39,7 @@ def calcular_angulos_frame(landmarks):  # calcula o angulo de todos tripletos em
             angulos[f"{a_idx}-{b_idx}-{c_idx}"] = angulo
     return angulos
 
-def comparar_angulos(ang_atual, ang_salvo, threshold=3.5):
+def comparar_angulos(ang_atual, ang_salvo, threshold=20):
     valores_comparados = []
     for chave, angulo_salvo in ang_salvo.items():
         if chave in ang_atual and isinstance(angulo_salvo, (int, float)):
@@ -49,4 +49,5 @@ def comparar_angulos(ang_atual, ang_salvo, threshold=3.5):
         return False
     # Root Mean Squared Error -> raiz da media dos erros quadraticos
     rmse = np.sqrt(np.mean(valores_comparados))
+    print(f"RMSE: {rmse:.2f} (Threshold: {threshold})")
     return rmse < threshold
