@@ -11,6 +11,7 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 
 from GeometryUtils import calcular_angulos_frame
+from MediapipePoseEstimation import PRESENCE_THRESHOLD
 
 # Argumentos de linha de comando
 parser = argparse.ArgumentParser(description="Estimador de pose usando MediaPipe")
@@ -46,8 +47,13 @@ with PoseLandmarker.create_from_options(options) as landmarker:
         result = landmarker.detect(mp_image)
 
         frame_key = f'frame_{idx}'
-        if result.pose_landmarks:            
-            pose_outputs[frame_key] = calcular_angulos_frame(result.pose_landmarks[0])
+        if result.pose_landmarks:
+            landmarks = result.pose_landmarks[0]
+            landmarks_filtrados = [
+                lm if getattr(lm, "presence", 1.0) >= PRESENCE_THRESHOLD else None
+                for lm in landmarks
+            ]            
+            pose_outputs[frame_key] = calcular_angulos_frame(landmarks_filtrados)
         else:
             pose_outputs[frame_key] = {}
 

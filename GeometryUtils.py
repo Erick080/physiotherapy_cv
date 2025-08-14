@@ -2,6 +2,8 @@
 import math
 import numpy as np
 
+POSE_ERROR_THRESHOLD = 15  # RMSE mínimo para detectar uma pose como correta 
+
 TRIPLETOS = [
     (11, 13, 15),    # OMBRO E BRACO ESQUERDO
     (12, 14, 16),    # OMBRO E BRACO DIREITO
@@ -28,26 +30,42 @@ def calcular_angulo_2d(a, b, c):    # calcula o angulo de um tripleto (angulo en
     angulo_rad = math.acos(cos_angulo)
     return math.degrees(angulo_rad)
 
+# TODO: Adicionar uma flag de debug que avisa caso um angulo nao possa ser calculado
 def calcular_angulos_frame(landmarks):  # calcula o angulo de todos tripletos em um frame
     angulos = {}
     for a_idx, b_idx, c_idx in TRIPLETOS:
+        # Verifica se algum dos landmarks é None (presença baixa)
+        if (landmarks[a_idx] is None or
+            landmarks[b_idx] is None or
+            landmarks[c_idx] is None):
+            continue
+
         p_a = landmarks[a_idx]
         p_b = landmarks[b_idx]
         p_c = landmarks[c_idx]
         angulo = calcular_angulo_2d(p_a, p_b, p_c)
-        if angulo is not None:
-            angulos[f"{a_idx}-{b_idx}-{c_idx}"] = angulo
+        angulos[f"{a_idx}-{b_idx}-{c_idx}"] = angulo
     return angulos
 
-def comparar_angulos(ang_atual, ang_salvo, threshold=20):
+# Compara os angulos de todos tripletos no frame
+def comparar_angulos(angulos_detec, angulos_salvos, tipo_exercicio):
     valores_comparados = []
-    for chave, angulo_salvo in ang_salvo.items():
-        if chave in ang_atual and isinstance(angulo_salvo, (int, float)):
+    for chave, angulo_salvo in angulos_salvos.items():
+        if chave in angulos_detec:
             # calcula erro quadratico entre os angulos
-            valores_comparados.append((ang_atual[chave] - angulo_salvo) ** 2)
-    if not valores_comparados:
+            valores_comparados.append((angulos_detec[chave] - angulo_salvo) ** 2)
+
+        elif tipo_exercicio == 'braco' and chave in ['11-13-15', '12-14-16']:
+            print("Nao detectou braco")
+            return False
+        
+        elif tipo_exercicio == 'perna' and chave in ['23-25-27', '24-26-28']:
+            print("Nao detectou pernas")
+            return False
+
+    if not valores_comparados: # se nao detectou nada retorna falso
         return False
     # Root Mean Squared Error -> raiz da media dos erros quadraticos
     rmse = np.sqrt(np.mean(valores_comparados))
-    print(f"RMSE: {rmse:.2f} (Threshold: {threshold})")
-    return rmse < threshold
+    print(f"RMSE: {rmse:.2f} (Threshold: {POSE_ERROR_THRESHOLD})")
+    return rmse < POSE_ERROR_THRESHOLD

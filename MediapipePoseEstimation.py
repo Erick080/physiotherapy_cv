@@ -10,6 +10,8 @@ from mediapipe.framework.formats import landmark_pb2
 
 from GeometryUtils import calcular_angulos_frame, comparar_angulos
 
+PRESENCE_THRESHOLD = 0.5   # Limite de presença para considerar um landmark válido
+
 # Parser de argumentos
 parser = argparse.ArgumentParser(description="Estimativa de pose com MediaPipe Tasks API")
 parser.add_argument("--model", choices=["lite", "full", "heavy"], default="full",
@@ -57,6 +59,7 @@ while True:
 
 tipo_exercicio = dados_exercicio_selecionado.get('tipo_exercicio')
 angulos_ref = dados_exercicio_selecionado.get('frames', {})
+
 # Configurações do PoseLandmarker
 BaseOptions = mp.tasks.BaseOptions
 PoseLandmarker = mp.tasks.vision.PoseLandmarker
@@ -67,19 +70,10 @@ VisionRunningMode = mp.tasks.vision.RunningMode
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
-# Variável para armazenar o resultado mais recente em deteccao assincrona
-latest_result = None
-
-# Callback para processar o resultado (usado em deteccao assincrona)
-def result_callback(result: vision.PoseLandmarkerResult, output_image: mp.Image, timestamp_ms: int):
-    global latest_result
-    latest_result = result
-
 # Cria o detector
 options = PoseLandmarkerOptions(
     base_options=BaseOptions(model_asset_path=model_path),
     running_mode=VisionRunningMode.VIDEO,
-    #result_callback=result_callback, --> usado para deteccao assincrona
     output_segmentation_masks=False,
     num_poses=1
 )
@@ -111,12 +105,18 @@ with PoseLandmarker.create_from_options(options) as landmarker:
         if result.pose_landmarks:
             landmarks = result.pose_landmarks[0]
             landmark_list = landmark_pb2.NormalizedLandmarkList()
+            landmarks_filtrados = []
             for lm in landmarks:
                 landmark = landmark_pb2.NormalizedLandmark(
                     x=lm.x, y=lm.y, z=lm.z,
                     visibility=lm.visibility, presence=lm.presence
                 )
                 landmark_list.landmark.append(landmark)
+
+                if lm.presence >= PRESENCE_THRESHOLD:
+                    landmarks_filtrados.append(lm)
+                else:
+                    landmarks_filtrados.append(None)
 
             # Verificar se é melhor desenhar as linhas antes ou depois do cálculo de corretude
             mp_drawing.draw_landmarks(
@@ -127,9 +127,9 @@ with PoseLandmarker.create_from_options(options) as landmarker:
                 mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
             )
             
-            angulos_detect_frame = calcular_angulos_frame(landmarks)
+            angulos_detect_frame = calcular_angulos_frame(landmarks_filtrados)
             angulos_ref_frame = angulos_ref.get(f'frame_{pose_index}', {})
-            if comparar_angulos(angulos_detect_frame, angulos_ref_frame):
+            if comparar_angulos(angulos_detect_frame, angulos_ref_frame, tipo_exercicio):
                 pose_index += 1
                 if pose_index >= len(angulos_ref):
                     pose_index = 0
