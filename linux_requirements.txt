@@ -19,6 +19,7 @@ packaging==25.0
 pillow==11.3.0
 protobuf==4.25.8
 pycparser==2.22
+pygame==2.6.1
 pyparsing==3.2.3
 python-dateutil==2.9.0.post0
 PyYAML==6.0.2

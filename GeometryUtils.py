@@ -48,7 +48,7 @@ def calcular_angulos_frame(landmarks):  # calcula o angulo de todos tripletos em
     return angulos
 
 # Compara os angulos de todos tripletos no frame
-def comparar_angulos(angulos_detec, angulos_salvos, tipo_exercicio):
+def comparar_angulos(angulos_detec, angulos_salvos, tipo_exercicio, debug=False):
     valores_comparados = []
     for chave, angulo_salvo in angulos_salvos.items():
         if chave in angulos_detec:
@@ -56,16 +56,19 @@ def comparar_angulos(angulos_detec, angulos_salvos, tipo_exercicio):
             valores_comparados.append((angulos_detec[chave] - angulo_salvo) ** 2)
 
         elif tipo_exercicio == 'braco' and chave in ['11-13-15', '12-14-16']:
-            print("Nao detectou braco")
+            if debug:
+                print("Nao detectou braco")
             return False
         
         elif tipo_exercicio == 'perna' and chave in ['23-25-27', '24-26-28']:
-            print("Nao detectou pernas")
+            if debug:
+                print("Nao detectou pernas")
             return False
 
     if not valores_comparados: # se nao detectou nada retorna falso
         return False
     # Root Mean Squared Error -> raiz da media dos erros quadraticos
     rmse = np.sqrt(np.mean(valores_comparados))
-    print(f"RMSE: {rmse:.2f} (Threshold: {POSE_ERROR_THRESHOLD})")
+    if debug:
+        print(f"RMSE: {rmse:.2f} (Threshold: {POSE_ERROR_THRESHOLD})")
     return rmse < POSE_ERROR_THRESHOLD

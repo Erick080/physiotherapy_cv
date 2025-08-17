@@ -8,9 +8,17 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from mediapipe.framework.formats import landmark_pb2
 
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
+import pygame
+
 from GeometryUtils import calcular_angulos_frame, comparar_angulos
 
 PRESENCE_THRESHOLD = 0.5   # Limite de presença para considerar um landmark válido
+
+LARGURA_JANELA = 800
+ALTURA_JANELA = 600
+
+DEBUG = False
 
 # Parser de argumentos
 parser = argparse.ArgumentParser(description="Estimativa de pose com MediaPipe Tasks API")
@@ -78,11 +86,19 @@ options = PoseLandmarkerOptions(
     num_poses=1
 )
 
-# Inicia a webcam
+# Inicia a webcam e configuracoes da janela do opencv
+window_name = "MediaPipe Pose (Tasks API)"
+cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+cv2.resizeWindow(window_name, LARGURA_JANELA, ALTURA_JANELA)
+
 cap = cv2.VideoCapture(0)
 if not cap.isOpened():
     print("Erro ao abrir a webcam.")
     exit()
+
+# Configuracao de feedback sonoro
+pygame.mixer.init()
+success_sound = pygame.mixer.Sound('success_bell.mp3')
 
 with PoseLandmarker.create_from_options(options) as landmarker:
     pose_index = 0 # Index da pose atual sendo usada na comparacao
@@ -129,8 +145,9 @@ with PoseLandmarker.create_from_options(options) as landmarker:
             
             angulos_detect_frame = calcular_angulos_frame(landmarks_filtrados)
             angulos_ref_frame = angulos_ref.get(f'frame_{pose_index}', {})
-            if comparar_angulos(angulos_detect_frame, angulos_ref_frame, tipo_exercicio):
+            if comparar_angulos(angulos_detect_frame, angulos_ref_frame, tipo_exercicio, DEBUG):
                 pose_index += 1
+                success_sound.play()
                 if pose_index >= len(angulos_ref):
                     pose_index = 0
                     reps += 1
@@ -145,12 +162,14 @@ with PoseLandmarker.create_from_options(options) as landmarker:
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
         
         # FPS
-        fps = 1 / (time.time() - start_time + 1e-6)
-        cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        if DEBUG:
+            fps = 1 / (time.time() - start_time + 1e-6)
+            cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
 
         # Mostra a imagem
-        cv2.imshow("MediaPipe Pose (Tasks API)", frame)
+        frame_redimensionado = cv2.resize(frame, (LARGURA_JANELA, ALTURA_JANELA), interpolation=cv2.INTER_LINEAR)
+        cv2.imshow(window_name, frame_redimensionado)
         
         # Verifica se a tecla 'q' foi pressionada para sair
         if cv2.waitKey(1) & 0xFF == ord('q'):
