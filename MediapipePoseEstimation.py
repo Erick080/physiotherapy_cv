@@ -156,13 +156,30 @@ with PoseLandmarker.create_from_options(options) as landmarker:
                 frame,
                 landmark_list,
                 mp_pose.POSE_CONNECTIONS,
-                mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
-                mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
+                mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=2, circle_radius=2),
+                mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2)
             )
             
             angulos_detect_frame = calcular_angulos_frame(landmarks_filtrados)
             angulos_ref_frame = angulos_ref.get(f'frame_{pose_index}', {})
-            if comparar_angulos(angulos_detect_frame, angulos_ref_frame, tipo_exercicio, DEBUG):
+
+            pose_correta, tripletos_errados = comparar_angulos(
+                angulos_detect_frame, angulos_ref_frame, tipo_exercicio, DEBUG
+            )
+
+            # Desenha de vermelho os tripletos que estao errados
+            for a_idx, b_idx, c_idx in tripletos_errados:
+                pontos = [landmarks_filtrados[a_idx], landmarks_filtrados[b_idx], landmarks_filtrados[c_idx]]
+                if None not in pontos:
+                    # Desenha linha AB
+                    x1, y1 = int(pontos[0].x * frame.shape[1]), int(pontos[0].y * frame.shape[0])
+                    x2, y2 = int(pontos[1].x * frame.shape[1]), int(pontos[1].y * frame.shape[0])
+                    cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 6)
+                    # Desenha linha CB
+                    x3, y3 = int(pontos[2].x * frame.shape[1]), int(pontos[2].y * frame.shape[0])
+                    cv2.line(frame, (x3, y3), (x2, y2), (0, 0, 255), 6)
+
+            if pose_correta:
                 pose_index += 1
                 success_sound.play()
                 if pose_index >= len(angulos_ref):
