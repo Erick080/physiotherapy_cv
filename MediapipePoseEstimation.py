@@ -83,6 +83,7 @@ while True:
         print("Entrada inválida, digite um número.")
 
 tipo_exercicio = dados_exercicio_selecionado.get('tipo_exercicio')
+tempo_alongamento = dados_exercicio_selecionado.get('tempo_alongamento') # segundos
 angulos_ref = dados_exercicio_selecionado.get('frames', {})
 
 # Configurações do PoseLandmarker
@@ -117,12 +118,12 @@ if not cap.isOpened():
 pygame.mixer.init()
 success_sound = pygame.mixer.Sound('success_bell.mp3')
 
+inicio_alongamento = 0
+timer_alongamento = 0
 with PoseLandmarker.create_from_options(options) as landmarker:
     pose_index = 0 # Index da pose atual sendo usada na comparacao
     reps = 0 # Contador de repetições
     while True:
-        start_time = time.time()
-        
         ret, frame = cap.read()
         if not ret:
             print("Erro ao capturar frame.")
@@ -164,7 +165,8 @@ with PoseLandmarker.create_from_options(options) as landmarker:
             angulos_ref_frame = angulos_ref.get(f'frame_{pose_index}', {})
 
             pose_correta, tripletos_errados = comparar_angulos(
-                angulos_detect_frame, angulos_ref_frame, tipo_exercicio, DEBUG
+                angulos_detect_frame, angulos_ref_frame, tipo_exercicio, DEBUG,
+                (tempo_alongamento > 0 and inicio_alongamento > 0) # indica se esta segurando o alongamento
             )
 
             # Desenha de vermelho os tripletos que estao errados
@@ -180,28 +182,35 @@ with PoseLandmarker.create_from_options(options) as landmarker:
                     cv2.line(frame, (x3, y3), (x2, y2), (0, 0, 255), 6)
 
             if pose_correta:
-                pose_index += 1
-                success_sound.play()
-                if pose_index >= len(angulos_ref):
-                    pose_index = 0
-                    reps += 1
+                if inicio_alongamento == 0:
+                    inicio_alongamento = time.time()
+                else:
+                    timer_alongamento = time.time() - inicio_alongamento
+                    if timer_alongamento >= tempo_alongamento:
+                        pose_index += 1
+                        success_sound.play()
+                        timer_alongamento = 0
+                        if pose_index >= len(angulos_ref):
+                            pose_index = 0
+                            reps += 1
+            else:
+                inicio_alongamento = 0
+                timer_alongamento = 0
 
         frame = cv2.flip(frame, 1) # inverte no eixo x por causa do espelhamento
 
         # Mostra número de poses detectadas e quantas faltam para acabar o exercicio
         num_poses = len(angulos_ref)
         cv2.putText(frame, f"Pose {pose_index}/{num_poses}", (10, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         
         # Mostra numero de repetições
         cv2.putText(frame, f"Reps: {reps}", (10, 100),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         
-        # FPS
-        if DEBUG:
-            fps = 1 / (time.time() - start_time + 1e-6)
-            cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        # Timer de alongamento
+        cv2.putText(frame, f"Hold Time: {timer_alongamento:.2f}s", (10, 140), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
         # Carrega imagem de referencia
         ref_img_path = os.path.join(exercicio_img_dir, exercicio_imgs[pose_index])

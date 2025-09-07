@@ -2,7 +2,7 @@
 import math
 import numpy as np
 
-POSE_ERROR_THRESHOLD = 12  # RMSE mínimo para detectar uma pose como correta 
+POSE_ERROR_THRESHOLD = 15  # RMSE mínimo para detectar uma pose como correta 
 
 TRIPLETOS = [
     (11, 13, 15),    # OMBRO E BRACO ESQUERDO
@@ -50,7 +50,9 @@ def calcular_angulos_frame(landmarks, debug=False):  # calcula o angulo de todos
 
 # Compara os angulos de todos tripletos no frame, retorna o booleano indicando se 
 # a pose esta correta e uma lista com os tripletos que estao errados
-def comparar_angulos(angulos_detec, angulos_salvos, tipo_exercicio, debug=False):
+def comparar_angulos(angulos_detec, angulos_salvos, tipo_exercicio, debug=False, segurando_alongamento=False):
+    threshold_ajustado = POSE_ERROR_THRESHOLD * 4 if segurando_alongamento else POSE_ERROR_THRESHOLD 
+
     valores_comparados = []
     tripletos_errados = []
     for chave, angulo_salvo in angulos_salvos.items():
@@ -77,4 +79,4 @@ def comparar_angulos(angulos_detec, angulos_salvos, tipo_exercicio, debug=False)
     rmse = np.sqrt(np.mean(valores_comparados))
     if debug:
         print(f"RMSE: {rmse:.2f} (Threshold: {POSE_ERROR_THRESHOLD})")
-    return rmse < POSE_ERROR_THRESHOLD, tripletos_errados
+    return rmse < threshold_ajustado, tripletos_errados
