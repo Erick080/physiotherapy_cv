@@ -15,8 +15,8 @@ from GeometryUtils import calcular_angulos_frame, comparar_angulos
 
 PRESENCE_THRESHOLD = 0.5   # Limite de presença para considerar um landmark válido
 
-LARGURA_JANELA = 800
-ALTURA_JANELA = 600
+LARGURA_JANELA = 1890
+ALTURA_JANELA = 1020
 
 DEBUG = False
 
