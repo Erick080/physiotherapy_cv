@@ -13,10 +13,16 @@ import pygame
 
 from GeometryUtils import calcular_angulos_frame, comparar_angulos
 
+import numpy as np
+
 PRESENCE_THRESHOLD = 0.5   # Limite de presença para considerar um landmark válido
 
-LARGURA_JANELA = 1890
-ALTURA_JANELA = 1020
+LARGURA_JANELA = 1920
+ALTURA_JANELA = 1080
+
+largura_esquerda = int(LARGURA_JANELA * 2 / 3)
+largura_direita = LARGURA_JANELA - largura_esquerda  # 1/3 da largura
+
 
 DEBUG = False
 
@@ -52,13 +58,24 @@ for idx, nome in enumerate(exercicios):
     print(f"{idx+1}. {nome}")
 
 dados_exercicio_selecionado = {}
+exercicio_imgs = []
+
 while True:
     try:
         escolha = int(input("\nDigite o número do exercício desejado: "))
         if 1 <= escolha <= len(exercicios):
-            exercicio_selecionado = exercicios[escolha-1]
+            # Add angulos do exercicio em um dicionario (chave = frame valor = angulos)
             dados_exercicio_selecionado = exercicios_dados[escolha-1]
-            print(f"Exercício selecionado: {exercicio_selecionado}")
+
+            # Pega todas imagens do exercicio
+            exercicio_selecionado = exercicios[escolha-1]
+            exercicio_nome = exercicio_selecionado.replace('.yaml', '')
+            exercicio_img_dir = os.path.join("exercises_input", exercicio_nome)
+            exercicio_imgs = sorted([
+                f for f in os.listdir(exercicio_img_dir)
+            ])
+
+            print(f"Exercício selecionado: {exercicio_nome}")
             break
         else:
             print("Número inválido, tente novamente.")
@@ -66,6 +83,7 @@ while True:
         print("Entrada inválida, digite um número.")
 
 tipo_exercicio = dados_exercicio_selecionado.get('tipo_exercicio')
+tempo_alongamento = dados_exercicio_selecionado.get('tempo_alongamento') # segundos
 angulos_ref = dados_exercicio_selecionado.get('frames', {})
 
 # Configurações do PoseLandmarker
@@ -87,7 +105,7 @@ options = PoseLandmarkerOptions(
 )
 
 # Inicia a webcam e configuracoes da janela do opencv
-window_name = "MediaPipe Pose (Tasks API)"
+window_name = "Computer Vision Physiotherapy"
 cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
 cv2.resizeWindow(window_name, LARGURA_JANELA, ALTURA_JANELA)
 
@@ -100,12 +118,12 @@ if not cap.isOpened():
 pygame.mixer.init()
 success_sound = pygame.mixer.Sound('success_bell.mp3')
 
+inicio_alongamento = 0
+timer_alongamento = 0
 with PoseLandmarker.create_from_options(options) as landmarker:
     pose_index = 0 # Index da pose atual sendo usada na comparacao
     reps = 0 # Contador de repetições
     while True:
-        start_time = time.time()
-        
         ret, frame = cap.read()
         if not ret:
             print("Erro ao capturar frame.")
@@ -139,38 +157,73 @@ with PoseLandmarker.create_from_options(options) as landmarker:
                 frame,
                 landmark_list,
                 mp_pose.POSE_CONNECTIONS,
-                mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
-                mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=2)
+                mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=2, circle_radius=2),
+                mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2)
             )
             
             angulos_detect_frame = calcular_angulos_frame(landmarks_filtrados)
             angulos_ref_frame = angulos_ref.get(f'frame_{pose_index}', {})
-            if comparar_angulos(angulos_detect_frame, angulos_ref_frame, tipo_exercicio, DEBUG):
-                pose_index += 1
-                success_sound.play()
-                if pose_index >= len(angulos_ref):
-                    pose_index = 0
-                    reps += 1
+
+            pose_correta, tripletos_errados = comparar_angulos(
+                angulos_detect_frame, angulos_ref_frame, tipo_exercicio, DEBUG,
+                (tempo_alongamento > 0 and inicio_alongamento > 0) # indica se esta segurando o alongamento
+            )
+
+            # Desenha de vermelho os tripletos que estao errados
+            for a_idx, b_idx, c_idx in tripletos_errados:
+                pontos = [landmarks_filtrados[a_idx], landmarks_filtrados[b_idx], landmarks_filtrados[c_idx]]
+                if None not in pontos:
+                    # Desenha linha AB
+                    x1, y1 = int(pontos[0].x * frame.shape[1]), int(pontos[0].y * frame.shape[0])
+                    x2, y2 = int(pontos[1].x * frame.shape[1]), int(pontos[1].y * frame.shape[0])
+                    cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 6)
+                    # Desenha linha CB
+                    x3, y3 = int(pontos[2].x * frame.shape[1]), int(pontos[2].y * frame.shape[0])
+                    cv2.line(frame, (x3, y3), (x2, y2), (0, 0, 255), 6)
+
+            if pose_correta:
+                if inicio_alongamento == 0:
+                    inicio_alongamento = time.time()
+                else:
+                    timer_alongamento = time.time() - inicio_alongamento
+                    if timer_alongamento >= tempo_alongamento:
+                        pose_index += 1
+                        success_sound.play()
+                        timer_alongamento = 0
+                        if pose_index >= len(angulos_ref):
+                            pose_index = 0
+                            reps += 1
+            else:
+                inicio_alongamento = 0
+                timer_alongamento = 0
+
+        frame = cv2.flip(frame, 1) # inverte no eixo x por causa do espelhamento
 
         # Mostra número de poses detectadas e quantas faltam para acabar o exercicio
         num_poses = len(angulos_ref)
         cv2.putText(frame, f"Pose {pose_index}/{num_poses}", (10, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         
         # Mostra numero de repetições
         cv2.putText(frame, f"Reps: {reps}", (10, 100),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
         
-        # FPS
-        if DEBUG:
-            fps = 1 / (time.time() - start_time + 1e-6)
-            cv2.putText(frame, f"FPS: {fps:.2f}", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+        # Timer de alongamento
+        cv2.putText(frame, f"Hold Time: {timer_alongamento:.2f}s", (10, 140), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+        # Carrega imagem de referencia
+        ref_img_path = os.path.join(exercicio_img_dir, exercicio_imgs[pose_index])
+        ref_img_loaded = cv2.imread(ref_img_path)
+        ref_img_loaded = cv2.flip(ref_img_loaded, 1)
+        ref_img = cv2.resize(ref_img_loaded, (largura_direita , ALTURA_JANELA), interpolation=cv2.INTER_LINEAR)
+        
+        # Junta img de exec com de ref lado a lado
+        frame_redimensionado = cv2.resize(frame, (largura_esquerda, ALTURA_JANELA), interpolation=cv2.INTER_LINEAR)
+        frame_display = np.hstack((frame_redimensionado, ref_img))
 
         # Mostra a imagem
-        frame_redimensionado = cv2.resize(frame, (LARGURA_JANELA, ALTURA_JANELA), interpolation=cv2.INTER_LINEAR)
-        cv2.imshow(window_name, frame_redimensionado)
-        
+        cv2.imshow(window_name, frame_display)
         # Verifica se a tecla 'q' foi pressionada para sair
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

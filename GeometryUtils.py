@@ -30,14 +30,15 @@ def calcular_angulo_2d(a, b, c):    # calcula o angulo de um tripleto (angulo en
     angulo_rad = math.acos(cos_angulo)
     return math.degrees(angulo_rad)
 
-# TODO: Adicionar uma flag de debug que avisa caso um angulo nao possa ser calculado
-def calcular_angulos_frame(landmarks):  # calcula o angulo de todos tripletos em um frame
+def calcular_angulos_frame(landmarks, debug=False):  # calcula o angulo de todos tripletos em um frame
     angulos = {}
     for a_idx, b_idx, c_idx in TRIPLETOS:
         # Verifica se algum dos landmarks é None (presença baixa)
         if (landmarks[a_idx] is None or
             landmarks[b_idx] is None or
             landmarks[c_idx] is None):
+            if debug:
+                print(f'\nNao conseguiu detectar a posicao do tripleto ({a_idx}-{b_idx}-{c_idx})')
             continue
 
         p_a = landmarks[a_idx]
@@ -47,23 +48,30 @@ def calcular_angulos_frame(landmarks):  # calcula o angulo de todos tripletos em
         angulos[f"{a_idx}-{b_idx}-{c_idx}"] = angulo
     return angulos
 
-# Compara os angulos de todos tripletos no frame
-def comparar_angulos(angulos_detec, angulos_salvos, tipo_exercicio, debug=False):
+# Compara os angulos de todos tripletos no frame, retorna o booleano indicando se 
+# a pose esta correta e uma lista com os tripletos que estao errados
+def comparar_angulos(angulos_detec, angulos_salvos, tipo_exercicio, debug=False, segurando_alongamento=False):
+    threshold_ajustado = POSE_ERROR_THRESHOLD * 4 if segurando_alongamento else POSE_ERROR_THRESHOLD 
+
     valores_comparados = []
+    tripletos_errados = []
     for chave, angulo_salvo in angulos_salvos.items():
         if chave in angulos_detec:
             # calcula erro quadratico entre os angulos
-            valores_comparados.append((angulos_detec[chave] - angulo_salvo) ** 2)
+            erro_quadratico = (angulos_detec[chave] - angulo_salvo) ** 2
+            valores_comparados.append(erro_quadratico)
+            if erro_quadratico > (POSE_ERROR_THRESHOLD ** 2):
+                tripletos_errados.append(tuple(map(int, chave.split('-'))))                
 
         elif tipo_exercicio == 'braco' and chave in ['11-13-15', '12-14-16']:
             if debug:
                 print("Nao detectou braco")
-            return False
+            return False, []
         
         elif tipo_exercicio == 'perna' and chave in ['23-25-27', '24-26-28']:
             if debug:
                 print("Nao detectou pernas")
-            return False
+            return False, []
 
     if not valores_comparados: # se nao detectou nada retorna falso
         return False
@@ -71,4 +79,4 @@ def comparar_angulos(angulos_detec, angulos_salvos, tipo_exercicio, debug=False)
     rmse = np.sqrt(np.mean(valores_comparados))
     if debug:
         print(f"RMSE: {rmse:.2f} (Threshold: {POSE_ERROR_THRESHOLD})")
-    return rmse < POSE_ERROR_THRESHOLD
+    return rmse < threshold_ajustado, tripletos_errados
