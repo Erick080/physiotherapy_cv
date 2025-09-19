@@ -3,6 +3,7 @@ import time
 import argparse
 import os
 import yaml
+import numpy as np
 import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
@@ -12,8 +13,7 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 import pygame
 
 from GeometryUtils import calcular_angulos_frame, comparar_angulos
-
-import numpy as np
+from DrawingUtils import draw_skeleton, draw_stats, load_ref_img
 
 PRESENCE_THRESHOLD = 0.5   # Limite de presença para considerar um landmark válido
 
@@ -92,10 +92,6 @@ PoseLandmarker = mp.tasks.vision.PoseLandmarker
 PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions
 VisionRunningMode = mp.tasks.vision.RunningMode
 
-# Utilitário de desenho
-mp_drawing = mp.solutions.drawing_utils
-mp_pose = mp.solutions.pose
-
 # Cria o detector
 options = PoseLandmarkerOptions(
     base_options=BaseOptions(model_asset_path=model_path),
@@ -120,9 +116,13 @@ success_sound = pygame.mixer.Sound('success_bell.mp3')
 
 inicio_alongamento = 0
 timer_alongamento = 0
+
 with PoseLandmarker.create_from_options(options) as landmarker:
+
     pose_index = 0 # Index da pose atual sendo usada na comparacao
+    ref_img_loaded = load_ref_img(exercicio_img_dir, exercicio_imgs, pose_index)
     reps = 0 # Contador de repetições
+    
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -151,15 +151,6 @@ with PoseLandmarker.create_from_options(options) as landmarker:
                     landmarks_filtrados.append(lm)
                 else:
                     landmarks_filtrados.append(None)
-
-            # Verificar se é melhor desenhar as linhas antes ou depois do cálculo de corretude
-            mp_drawing.draw_landmarks(
-                frame,
-                landmark_list,
-                mp_pose.POSE_CONNECTIONS,
-                mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=2, circle_radius=2),
-                mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2)
-            )
             
             angulos_detect_frame = calcular_angulos_frame(landmarks_filtrados)
             angulos_ref_frame = angulos_ref.get(f'frame_{pose_index}', {})
@@ -169,17 +160,7 @@ with PoseLandmarker.create_from_options(options) as landmarker:
                 (tempo_alongamento > 0 and inicio_alongamento > 0) # indica se esta segurando o alongamento
             )
 
-            # Desenha de vermelho os tripletos que estao errados
-            for a_idx, b_idx, c_idx in tripletos_errados:
-                pontos = [landmarks_filtrados[a_idx], landmarks_filtrados[b_idx], landmarks_filtrados[c_idx]]
-                if None not in pontos:
-                    # Desenha linha AB
-                    x1, y1 = int(pontos[0].x * frame.shape[1]), int(pontos[0].y * frame.shape[0])
-                    x2, y2 = int(pontos[1].x * frame.shape[1]), int(pontos[1].y * frame.shape[0])
-                    cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 6)
-                    # Desenha linha CB
-                    x3, y3 = int(pontos[2].x * frame.shape[1]), int(pontos[2].y * frame.shape[0])
-                    cv2.line(frame, (x3, y3), (x2, y2), (0, 0, 255), 6)
+            draw_skeleton(frame, landmark_list, landmarks_filtrados, tripletos_errados)
 
             if pose_correta:
                 if inicio_alongamento == 0:
@@ -193,34 +174,22 @@ with PoseLandmarker.create_from_options(options) as landmarker:
                         if pose_index >= len(angulos_ref):
                             pose_index = 0
                             reps += 1
+
+                        ref_img_loaded = load_ref_img(exercicio_img_dir, exercicio_imgs, pose_index)
             else:
                 inicio_alongamento = 0
                 timer_alongamento = 0
 
-        frame = cv2.flip(frame, 1) # inverte no eixo x por causa do espelhamento
+        frame = cv2.flip(frame, 1) # inverte no eixo x por causa do espelhamento da camera
 
-        # Mostra número de poses detectadas e quantas faltam para acabar o exercicio
         num_poses = len(angulos_ref)
-        cv2.putText(frame, f"Pose {pose_index}/{num_poses}", (10, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        
-        # Mostra numero de repetições
-        cv2.putText(frame, f"Reps: {reps}", (10, 100),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        
-        # Timer de alongamento
-        cv2.putText(frame, f"Hold Time: {timer_alongamento:.2f}s", (10, 140), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        draw_stats(frame, pose_index, num_poses, reps, timer_alongamento)
 
-        # Carrega imagem de referencia
-        ref_img_path = os.path.join(exercicio_img_dir, exercicio_imgs[pose_index])
-        ref_img_loaded = cv2.imread(ref_img_path)
-        ref_img_loaded = cv2.flip(ref_img_loaded, 1)
-        ref_img = cv2.resize(ref_img_loaded, (largura_direita , ALTURA_JANELA), interpolation=cv2.INTER_LINEAR)
+        ref_img_resized = cv2.resize(ref_img_loaded, (largura_direita , ALTURA_JANELA), interpolation=cv2.INTER_LINEAR)
         
         # Junta img de exec com de ref lado a lado
         frame_redimensionado = cv2.resize(frame, (largura_esquerda, ALTURA_JANELA), interpolation=cv2.INTER_LINEAR)
-        frame_display = np.hstack((frame_redimensionado, ref_img))
+        frame_display = np.hstack((frame_redimensionado, ref_img_resized))
 
         # Mostra a imagem
         cv2.imshow(window_name, frame_display)
