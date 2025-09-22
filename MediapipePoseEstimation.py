@@ -12,7 +12,7 @@ from mediapipe.framework.formats import landmark_pb2
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1'
 import pygame
 
-from GeometryUtils import calcular_angulos_frame, comparar_angulos
+from GeometryUtils import calcular_angulos_frame, comparar_angulos, get_media_angulos
 from DrawingUtils import draw_skeleton, draw_stats, load_ref_img
 
 PRESENCE_THRESHOLD = 0.5   # Limite de presença para considerar um landmark válido
@@ -25,7 +25,7 @@ largura_direita = LARGURA_JANELA - largura_esquerda  # 1/3 da largura
 
 
 DEBUG = False
-
+    
 # Parser de argumentos
 parser = argparse.ArgumentParser(description="Estimativa de pose com MediaPipe Tasks API")
 parser.add_argument("--model", choices=["lite", "full", "heavy"], default="full",
@@ -122,6 +122,9 @@ with PoseLandmarker.create_from_options(options) as landmarker:
     pose_index = 0 # Index da pose atual sendo usada na comparacao
     ref_img_loaded = load_ref_img(exercicio_img_dir, exercicio_imgs, pose_index)
     reps = 0 # Contador de repetições
+
+    conjunto_frames = []
+    holding = False
     
     while True:
         ret, frame = cap.read()
@@ -155,22 +158,32 @@ with PoseLandmarker.create_from_options(options) as landmarker:
             angulos_detect_frame = calcular_angulos_frame(landmarks_filtrados)
             angulos_ref_frame = angulos_ref.get(f'frame_{pose_index}', {})
 
-            pose_correta, tripletos_errados = comparar_angulos(
-                angulos_detect_frame, angulos_ref_frame, tipo_exercicio, DEBUG,
-                (tempo_alongamento > 0 and inicio_alongamento > 0) # indica se esta segurando o alongamento
-            )
+            if holding:
+                conjunto_frames.append(angulos_detect_frame)
+
+            if not holding or len(conjunto_frames) == 10:
+                if len(conjunto_frames) > 0:
+                    angulos_detect_frame = get_media_angulos(conjunto_frames)
+
+                pose_correta, tripletos_errados = comparar_angulos(
+                    angulos_detect_frame, angulos_ref_frame, tipo_exercicio, DEBUG
+                )
 
             draw_skeleton(frame, landmark_list, landmarks_filtrados, tripletos_errados)
 
             if pose_correta:
                 if inicio_alongamento == 0:
                     inicio_alongamento = time.time()
+                    holding = True
                 else:
                     timer_alongamento = time.time() - inicio_alongamento
                     if timer_alongamento >= tempo_alongamento:
                         pose_index += 1
                         success_sound.play()
+                        inicio_alongamento = 0
                         timer_alongamento = 0
+                        holding = False
+                        conjunto_frames = []
                         if pose_index >= len(angulos_ref):
                             pose_index = 0
                             reps += 1
@@ -179,6 +192,8 @@ with PoseLandmarker.create_from_options(options) as landmarker:
             else:
                 inicio_alongamento = 0
                 timer_alongamento = 0
+                holding = False
+                conjunto_frames = []
 
         frame = cv2.flip(frame, 1) # inverte no eixo x por causa do espelhamento da camera
 

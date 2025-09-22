@@ -48,11 +48,27 @@ def calcular_angulos_frame(landmarks, debug=False):  # calcula o angulo de todos
         angulos[f"{a_idx}-{b_idx}-{c_idx}"] = angulo
     return angulos
 
+def get_media_angulos(arr_frames):
+    media_angulos = {}
+    contagem =  {}
+
+    for frame in arr_frames:
+        for chave, angulo in frame.items():
+            if chave in media_angulos:
+                media_angulos[chave] += angulo
+                contagem[chave] += 1
+            else:
+                media_angulos[chave] = angulo
+                contagem[chave] = 1
+    
+    for chave in media_angulos:
+        media_angulos[chave] = media_angulos[chave] / contagem[chave]
+
+    return media_angulos 
+
 # Compara os angulos de todos tripletos no frame, retorna o booleano indicando se 
 # a pose esta correta e uma lista com os tripletos que estao errados
-def comparar_angulos(angulos_detec, angulos_salvos, tipo_exercicio, debug=False, segurando_alongamento=False):
-    threshold_ajustado = POSE_ERROR_THRESHOLD * 4 if segurando_alongamento else POSE_ERROR_THRESHOLD 
-
+def comparar_angulos(angulos_detec, angulos_salvos, tipo_exercicio, debug=False):
     valores_comparados = []
     tripletos_errados = []
     for chave, angulo_salvo in angulos_salvos.items():
@@ -79,4 +95,4 @@ def comparar_angulos(angulos_detec, angulos_salvos, tipo_exercicio, debug=False,
     rmse = np.sqrt(np.mean(valores_comparados))
     if debug:
         print(f"RMSE: {rmse:.2f} (Threshold: {POSE_ERROR_THRESHOLD})")
-    return rmse < threshold_ajustado, tripletos_errados
+    return rmse < POSE_ERROR_THRESHOLD, tripletos_errados
