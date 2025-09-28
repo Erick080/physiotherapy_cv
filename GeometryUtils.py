@@ -79,12 +79,12 @@ def comparar_angulos(angulos_detec, angulos_salvos, tipo_exercicio, debug=False)
             if erro_quadratico > (POSE_ERROR_THRESHOLD ** 2):
                 tripletos_errados.append(tuple(map(int, chave.split('-'))))                
 
-        elif tipo_exercicio == 'braco' and chave in ['11-13-15', '12-14-16']:
+        # se nao detectou o angulo de um tripleto necessario para o tipo de exercicio, retorna falso
+        elif (tipo_exercicio == 'braco' or tipo_exercicio == 'braco_e_perna') and chave in ['11-13-15', '12-14-16']:
             if debug:
                 print("Nao detectou braco")
             return False, []
-        
-        elif tipo_exercicio == 'perna' and chave in ['23-25-27', '24-26-28']:
+        elif (tipo_exercicio == 'perna' or tipo_exercicio == 'braco_e_perna') and chave in ['23-25-27', '24-26-28']:
             if debug:
                 print("Nao detectou pernas")
             return False, []

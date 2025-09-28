@@ -19,7 +19,7 @@ parser.add_argument('--images_dir', type=str, required=True, help='Diretório co
 parser.add_argument('--model_type', type=str, required=True, choices=['heavy', 'full', 'lite'], help='Tipo de modelo a ser usado')
 parser.add_argument('--output_file', type=str, default='poses_output.yml', help='Arquivo de saída YAML')
 parser.add_argument('--tipo_exercicio', type=str, required=True, choices=['braco','perna','braco_e_perna'], help='Tipo do exercicio: braco, perna ou braco e perna')
-parser.add_argument('--tempo', type=int, required=True, help='Tipo do exercicio: braco, perna ou braco e perna')
+parser.add_argument('--tempo', type=int, required=True, help='Tempo em segundos de alongamento')
 
 args = parser.parse_args()
 

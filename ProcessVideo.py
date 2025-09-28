@@ -7,7 +7,7 @@ import mediapipe as mp
 def processar_video(video_entrada, video_saida):
     mp_drawing = mp.solutions.drawing_utils
     mp_pose = mp.solutions.pose
-    
+
     output_dir = os.path.dirname(video_saida)
     os.makedirs(output_dir, exist_ok=True)
 
@@ -51,23 +51,24 @@ def processar_video(video_entrada, video_saida):
         cv2.destroyAllWindows()
     print(f"Vídeo processado salvo em: {video_saida}")
 
-def selecionar_frames_de_video(video):
-    if not os.path.isfile(video):
-        print(f"Erro: O arquivo '{video}' não foi encontrado.")
+def selecionar_frames_de_video(video_original, video_processado, nome_exercicio):
+    if not os.path.isfile(video_original) or not os.path.isfile(video_processado):
+        print(f"Erro: Um dos arquivos de video não foi encontrado.")
         return
 
-    pasta_saida = f"./frames_selecionados/{os.path.basename(video)}"
+    pasta_saida = f"./exercises_input/{nome_exercicio}"
     
     try:
         os.makedirs(pasta_saida, exist_ok=True)
         print(f"Frames selecionados serão salvos em '{pasta_saida}/'")
-
     except OSError as e:
         print(f"Erro ao criar o diretório: {e}")
         return
+    
+    cap_original = cv2.VideoCapture(video_original)
+    cap_processado = cv2.VideoCapture(video_processado)
 
-    cap = cv2.VideoCapture(video)
-    if not cap.isOpened():
+    if not cap_original.isOpened() or not cap_processado.isOpened():
         print("Erro ao abrir o arquivo de vídeo.")
         return
 
@@ -81,14 +82,15 @@ def selecionar_frames_de_video(video):
     print("-----------------\n")
 
     while True:
-        ret, frame = cap.read()
+        ret_original, frame_original = cap_original.read()
+        ret_processado, frame_processado = cap_processado.read()
 
-        if not ret:
+        if not ret_original or not ret_processado:
             print("Fim do vídeo.")
             break
 
         cv2.putText(
-            frame,
+            frame_processado,
             f'Frame: {frame_atual_idx}',
             (15, 30), # Posição (x, y) no canto superior esquerdo
             cv2.FONT_HERSHEY_SIMPLEX,
@@ -97,7 +99,7 @@ def selecionar_frames_de_video(video):
             2 # Espessura da linha
         )
 
-        cv2.imshow('Seletor de Frames - Pressione "S" para Salvar, "Q" para Sair', frame)
+        cv2.imshow('Seletor de Frames - Pressione "S" para Salvar, "Q" para Sair', frame_processado)
 
         key = cv2.waitKey(0) & 0xFF
 
@@ -105,7 +107,7 @@ def selecionar_frames_de_video(video):
             nome_arquivo = f"frame_{frames_salvos_count:04d}.jpg"
             caminho_completo = os.path.join(pasta_saida, nome_arquivo)
             
-            cv2.imwrite(caminho_completo, frame)
+            cv2.imwrite(caminho_completo, frame_original)
             
             print(f"-> Frame {frame_atual_idx} salvo como '{nome_arquivo}'")
             frames_salvos_count += 1
@@ -116,7 +118,8 @@ def selecionar_frames_de_video(video):
                 
         frame_atual_idx += 1
 
-    cap.release()
+    cap_original.release()
+    cap_processado.release()
     cv2.destroyAllWindows()
     print(f"\nConcluído! {frames_salvos_count} frames foram salvos na pasta '{pasta_saida}'.")
 
@@ -124,6 +127,10 @@ def selecionar_frames_de_video(video):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Gera o esqueleto de um vídeo e salva frames selecionados.")
     parser.add_argument('--path', required=True, help='caminho para o vídeo desejado.')
+    parser.add_argument('--exercise_name', required=True, help='Nome do exercício a ser registrado.')
+    parser.add_argument('--exercise_type', required=True, choices=['braco','perna','braco_e_perna'], help='Tipo do exercício: braco, perna ou braco e perna')
+    parser.add_argument('--hold_time', type=int, required=True, help='Tempo em segundos que a pose deve ser mantida em segundos.')
+    
     args = parser.parse_args()
     
     if not os.path.isfile(args.path):
@@ -131,8 +138,17 @@ if __name__ == '__main__':
         sys.exit(1)
 
     video_entrada = args.path
-    nome_arquivo, _ = os.path.splitext(os.path.basename(video_entrada))
-    video_saida = f'./videos_processados/{nome_arquivo}.mp4'
+    nome_exercicio = args.exercise_name
+    video_saida = f'./videos_processados/{nome_exercicio}.mp4'
 
     processar_video(video_entrada, video_saida)
-    selecionar_frames_de_video(video_saida)
+    selecionar_frames_de_video(video_entrada, video_saida)
+
+    # Reaproveita o codigo para calcular os angulos dos frames de um diretorio
+    comando = f'''python ExerciseDataGenerator.py
+                    --images_dir ./exercises_input/{nome_exercicio}
+                    --model_type full   
+                    --output_file ./exercises_output/{nome_exercicio}.yaml
+                    --tipo_exercicio {args.exercise_type}
+                    --tempo {args.hold_time}'''
+    os.system(comando)
