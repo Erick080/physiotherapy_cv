@@ -3,6 +3,7 @@ import os
 import sys
 import argparse
 import mediapipe as mp
+import subprocess
 
 def processar_video(video_entrada, video_saida):
     mp_drawing = mp.solutions.drawing_utils
@@ -142,13 +143,22 @@ if __name__ == '__main__':
     video_saida = f'./videos_processados/{nome_exercicio}.mp4'
 
     processar_video(video_entrada, video_saida)
-    selecionar_frames_de_video(video_entrada, video_saida)
+    selecionar_frames_de_video(video_entrada, video_saida, nome_exercicio)
 
     # Reaproveita o codigo para calcular os angulos dos frames de um diretorio
-    comando = f'''python ExerciseDataGenerator.py
-                    --images_dir ./exercises_input/{nome_exercicio}
-                    --model_type full   
-                    --output_file ./exercises_output/{nome_exercicio}.yaml
-                    --tipo_exercicio {args.exercise_type}
-                    --tempo {args.hold_time}'''
-    os.system(comando)
+    comando = [
+        'python', './ExerciseDataGenerator.py',
+        '--images_dir', f'./exercises_input/{nome_exercicio}',
+        '--model_type', 'heavy',
+        '--output_file', f'./exercises_output/{nome_exercicio}.yaml',
+        '--tipo_exercicio', args.exercise_type,
+        '--tempo', str(args.hold_time)
+    ]
+
+    try:
+        result = subprocess.run(comando, check=True, capture_output=True, text=True)
+        print("Comando executado com sucesso!")
+        print(result.stdout)
+    except subprocess.CalledProcessError as e:
+        print(f"Erro ao executar comando: {e}")
+        print(f"Saída de erro: {e.stderr}")

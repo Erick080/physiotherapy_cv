@@ -3,6 +3,7 @@
 ### Depois vai calcular o angulo de cada tripleto (especificados no MediapipePoseEstimator.py) e salvar em
 ### um yml na pasta exercises_data, para ser usado futuramente na comparação
 
+#!/usr/bin/env python3
 import os
 import argparse
 import yaml
