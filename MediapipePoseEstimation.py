@@ -162,9 +162,10 @@ if __name__ == "__main__":
                 if holding:
                     conjunto_frames.append(angulos_detect_frame)
 
-                if not holding or len(conjunto_frames) == 10:
+                if not holding or len(conjunto_frames) == 5:
                     if len(conjunto_frames) > 0:
                         angulos_detect_frame = get_media_angulos(conjunto_frames)
+                        conjunto_frames = []
 
                     pose_correta, tripletos_errados = comparar_angulos(
                         angulos_detect_frame, angulos_ref_frame, tipo_exercicio, DEBUG
