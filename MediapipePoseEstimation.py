@@ -171,7 +171,7 @@ if __name__ == "__main__":
                         angulos_detect_frame, angulos_ref_frame, tipo_exercicio, DEBUG
                     )
 
-                draw_skeleton(frame, landmark_list, landmarks_filtrados, tripletos_errados)
+                draw_skeleton(frame, landmarks_filtrados, tripletos_errados)
 
                 if pose_correta:
                     if inicio_alongamento == 0:

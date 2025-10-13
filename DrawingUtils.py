@@ -2,30 +2,25 @@ import mediapipe as mp
 import cv2
 import os
 
+from GeometryUtils import TRIPLETOS
+
 mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
-def draw_skeleton(frame, landmark_list, landmarks_filtrados, tripletos_errados):
-    # inicialmente desenha todas arestas de verde
-    mp_drawing.draw_landmarks(
-                frame,
-                landmark_list,
-                mp_pose.POSE_CONNECTIONS,
-                mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=2, circle_radius=2),
-                mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2)
-            )
-    
-    # Desenha de vermelho os tripletos que estao errados
-    for a_idx, b_idx, c_idx in tripletos_errados:
+def draw_skeleton(frame, landmarks_filtrados, tripletos_errados):
+    for a_idx, b_idx, c_idx in TRIPLETOS:
         pontos = [landmarks_filtrados[a_idx], landmarks_filtrados[b_idx], landmarks_filtrados[c_idx]]
         if None not in pontos:
-            # Desenha linha AB
             x1, y1 = int(pontos[0].x * frame.shape[1]), int(pontos[0].y * frame.shape[0])
             x2, y2 = int(pontos[1].x * frame.shape[1]), int(pontos[1].y * frame.shape[0])
-            cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 6)
-            # Desenha linha CB
             x3, y3 = int(pontos[2].x * frame.shape[1]), int(pontos[2].y * frame.shape[0])
-            cv2.line(frame, (x3, y3), (x2, y2), (0, 0, 255), 6)
+
+            if (a_idx, b_idx, c_idx) in tripletos_errados:
+                cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 6)
+                cv2.line(frame, (x3, y3), (x2, y2), (0, 0, 255), 6)
+            else:
+                cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 6)
+                cv2.line(frame, (x3, y3), (x2, y2), (0, 255, 0), 6)
 
     return frame
     
