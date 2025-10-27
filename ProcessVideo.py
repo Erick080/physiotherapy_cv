@@ -4,9 +4,9 @@ import sys
 import argparse
 import mediapipe as mp
 import subprocess
+from DrawingUtils import draw_skeleton
 
 def processar_video(video_entrada, video_saida):
-    mp_drawing = mp.solutions.drawing_utils
     mp_pose = mp.solutions.pose
 
     output_dir = os.path.dirname(video_saida)
@@ -33,13 +33,9 @@ def processar_video(video_entrada, video_saida):
 
             resultados = pose.process(frame_rgb)
 
-            mp_drawing.draw_landmarks(
-                frame,
-                resultados.pose_landmarks,
-                mp_pose.POSE_CONNECTIONS,
-                mp_drawing.DrawingSpec(color=(245,117,66), thickness=2, circle_radius=2),
-                mp_drawing.DrawingSpec(color=(245,66,230), thickness=2, circle_radius=2)
-                )
+            if resultados.pose_landmarks:
+                landmarks_filtrados = list(resultados.pose_landmarks.landmark)
+                frame = draw_skeleton(frame, landmarks_filtrados, [])
 
             out.write(frame)
 
