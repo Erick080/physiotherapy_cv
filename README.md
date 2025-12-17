@@ -1,3 +1,7 @@
+<h1> Physiotherapy Computer Vision Application </h1>
+Uma aplicação de monitoramento de execução de exercícios fisioterapêuticos utilizando visão computacional. O modelo de estimação de pose MediaPipe Pose Landmarker é utilizado para a detecção do movimento corporal e o OpenCV como interface gráfica para feedback de execução.
+<img width="1684" height="941" alt="bremm_alongamentoperna" src="https://github.com/user-attachments/assets/b27cfcad-aed0-48fa-89c0-5254c4e6ecfe" />
+
 <h2>Instruções de Execução: </h2>
 
 * Inicie o ambiente virtual do python: `python3 -m venv .venv`
